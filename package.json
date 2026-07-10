@@ -1,0 +1,26 @@
+{
+  "name": "whale-diffusion",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun scripts/copy-ort-assets.ts public/ort && vite",
+    "build": "tsc -b && bun scripts/verify-model.ts && vite build && bun scripts/copy-ort-assets.ts",
+    "test": "bun test",
+    "typecheck": "tsc -b",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "onnxruntime-web": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "typescript": "latest"
+  }
+}

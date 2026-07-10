@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "types": ["bun"]
+  },
+  "include": ["vite.config.ts", "scripts/copy-ort-assets.ts", "scripts/verify-model.ts"]
+}

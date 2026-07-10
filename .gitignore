@@ -1,0 +1,9 @@
+node_modules/
+dist/
+public/ort/
+.DS_Store
+training/.venv/
+training/checkpoints/
+training/runs/
+__pycache__/
+*.pyc
