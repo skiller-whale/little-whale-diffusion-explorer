@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ddimStep, gaussianNoise, inferenceTimesteps, mulberry32, tensorToRgba, timestepEmbedding } from "./diffusion";
+import { ddimStep, gaussianNoise, inferenceTimesteps, mulberry32, seedConditioning, tensorToRgba, timestepEmbedding } from "./diffusion";
 
 describe("diffusion primitives", () => {
   test("seeded random values and Gaussian noise are repeatable", () => {
@@ -11,7 +11,8 @@ describe("diffusion primitives", () => {
     expect(inferenceTimesteps(10).at(-1)).toBe(0);
   });
   test("embedding and pixels have the public contract", () => {
-    expect(timestepEmbedding(500)).toHaveLength(160);
+    expect(timestepEmbedding(500)).toHaveLength(192);
+    expect([...seedConditioning(18)]).toEqual([0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     const pixels = tensorToRgba(new Float32Array(3 * 4), 2);
     expect(pixels).toHaveLength(16);
     expect(pixels[3]).toBe(255);

@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 import * as ort from "onnxruntime-web/webgpu";
-import { CHANNELS, ddimStep, gaussianNoise, IMAGE_SIZE, inferenceTimesteps, tensorToRgba, timestepEmbedding } from "./diffusion";
+import { CHANNELS, ddimStep, gaussianNoise, IMAGE_SIZE, inferenceTimesteps, seedConditioning, tensorToRgba, timestepEmbedding } from "./diffusion";
 import type { Backend, WorkerRequest, WorkerResponse } from "./protocol";
 
 const context: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope;
@@ -66,11 +66,12 @@ async function generate(id: number, seed: number, steps: number, frameDelayMs: n
     const previous = index + 1 < times.length ? times[index + 1] : -1;
     const result = await session.run({
       sample: new ort.Tensor("float32", sample, shape),
-      timestep_embedding: new ort.Tensor("float32", timestepEmbedding(timestep), [1, 160]),
+      timestep_embedding: new ort.Tensor("float32", timestepEmbedding(timestep), [1, 192]),
+      conditioning: new ort.Tensor("float32", seedConditioning(seed), [1, 16]),
     });
-    const clean = result.predicted_clean?.data;
-    if (!(clean instanceof Float32Array)) throw new Error("The model returned an invalid tensor");
-    sample = ddimStep(sample, clean, timestep, previous);
+    const velocity = result.predicted_velocity?.data;
+    if (!(velocity instanceof Float32Array)) throw new Error("The model returned an invalid tensor");
+    sample = ddimStep(sample, velocity, timestep, previous);
     pixels = tensorToRgba(sample);
     send({ type: "frame", id, index: index + 1, total: steps, pixels, elapsedMs: performance.now() - started }, [pixels.buffer]);
     await new Promise<void>((resolve) => setTimeout(resolve, frameDelayMs));

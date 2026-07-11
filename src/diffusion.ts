@@ -1,7 +1,8 @@
-export const IMAGE_SIZE = 32;
+export const IMAGE_SIZE = 64;
 export const CHANNELS = 3;
 export const TRAINING_STEPS = 1000;
-export const TIME_EMBEDDING_SIZE = 160;
+export const TIME_EMBEDDING_SIZE = 192;
+export const ORCA_ARCHETYPES = 16;
 
 export function mulberry32(seed: number): () => number {
   let value = seed >>> 0;
@@ -54,9 +55,15 @@ export function timestepEmbedding(timestep: number, size = TIME_EMBEDDING_SIZE):
   return embedding;
 }
 
+export function seedConditioning(seed: number): Float32Array {
+  const conditioning = new Float32Array(ORCA_ARCHETYPES);
+  conditioning[(seed >>> 0) % ORCA_ARCHETYPES] = 1;
+  return conditioning;
+}
+
 export function ddimStep(
   sample: Float32Array,
-  predictedClean: Float32Array,
+  predictedVelocity: Float32Array,
   timestep: number,
   previousTimestep: number,
   alphas = cosineAlphaCumprod(),
@@ -69,9 +76,9 @@ export function ddimStep(
   const sqrtPreviousOneMinusAlpha = Math.sqrt(Math.max(1 - previousAlpha, 0));
   const output = new Float32Array(sample.length);
   for (let i = 0; i < sample.length; i++) {
-    const clean = Math.max(-1, Math.min(1, predictedClean[i]));
-    const predictedNoise = (sample[i] - sqrtAlpha * clean) / Math.max(sqrtOneMinusAlpha, 1e-7);
-    output[i] = sqrtPreviousAlpha * clean + sqrtPreviousOneMinusAlpha * predictedNoise;
+    const clean = Math.max(-1, Math.min(1, sqrtAlpha * sample[i] - sqrtOneMinusAlpha * predictedVelocity[i]));
+    const noise = sqrtOneMinusAlpha * sample[i] + sqrtAlpha * predictedVelocity[i];
+    output[i] = sqrtPreviousAlpha * clean + sqrtPreviousOneMinusAlpha * noise;
   }
   return output;
 }

@@ -96,8 +96,7 @@ export function App() {
 
   return <main>
     <header className="hero">
-      <span className="eyebrow">A tiny model, swimming locally</span>
-      <h1>Little Whale<br /><em>Diffusion</em></h1>
+      <h1>Little Whale Diffusion</h1>
       <p>Start with static. Let a neural network predict what doesn’t belong. Repeat until something with a tail swims into view.</p>
     </header>
 
@@ -107,7 +106,7 @@ export function App() {
           <canvas ref={canvasRef} width={IMAGE_SIZE} height={IMAGE_SIZE} aria-label={`Diffusion image at step ${frameIndex}`} />
           <div className="scanline" />
           <span className="corner corner-tl">x<sub>{frameIndex === 0 ? "T" : frameIndex}</sub></span>
-          <span className="corner corner-br">32 × 32</span>
+          <span className="corner corner-br">64 × 64</span>
         </div>
         <div className="readout">
           <span><i className={`dot ${phase}`} />{status}</span>
@@ -141,8 +140,8 @@ export function App() {
     </section>
 
     <section className="how">
-      <article><span>01</span><h2>Noise</h2><p>A seeded cloud gives every run a repeatable starting point.</p></article>
-      <article><span>02</span><h2>Predict</h2><p>The tiny U-Net estimates the clean icon hidden at each timestep.</p></article>
+      <article><span>01</span><h2>Noise</h2><p>A seed selects an orca archetype and a repeatable starting cloud.</p></article>
+      <article><span>02</span><h2>Predict</h2><p>The U-Net predicts a stable blend of image and noise at each timestep.</p></article>
       <article><span>03</span><h2>Denoise</h2><p>DDIM removes that prediction, gradually revealing a whale.</p></article>
     </section>
     <footer>Inference stays on your device. No prompts, pixels, or whales leave this page.</footer>

@@ -1,4 +1,4 @@
-"""Deterministic, license-free whale icon synthesis."""
+"""Deterministic, license-free 64 px orca illustration synthesis."""
 from __future__ import annotations
 
 import math
@@ -10,96 +10,136 @@ from PIL import Image, ImageDraw, ImageFilter
 from torch.utils.data import Dataset
 
 
-PALETTES = [
-    ((7, 35, 53), (50, 124, 151), (148, 214, 215)),
-    ((15, 42, 61), (47, 93, 142), (178, 212, 228)),
-    ((8, 48, 58), (52, 143, 137), (176, 226, 205)),
-    ((24, 34, 64), (83, 91, 164), (196, 196, 235)),
-    ((10, 42, 48), (46, 111, 124), (213, 231, 210)),
+OCEANS = [
+    ((3, 24, 39), (7, 65, 82), (41, 132, 143)),
+    ((5, 25, 48), (15, 68, 105), (66, 143, 166)),
+    ((4, 34, 43), (10, 82, 87), (62, 151, 139)),
+    ((12, 23, 54), (31, 65, 112), (89, 137, 169)),
 ]
+ORCA_ARCHETYPES = 16
 
 
 @dataclass(frozen=True)
 class WhaleDatasetConfig:
-    length: int = 50_000
-    size: int = 32
+    length: int = 150_000
+    size: int = 64
     render_scale: int = 4
     seed: int = 24_601
 
 
-def _ellipse_point(cx: float, cy: float, rx: float, ry: float, angle: float) -> tuple[float, float]:
-    return cx + math.cos(angle) * rx, cy + math.sin(angle) * ry
+def _gradient(image: Image.Image, top: tuple[int, ...], bottom: tuple[int, ...]) -> None:
+    draw = ImageDraw.Draw(image)
+    for y in range(image.height):
+        mix = y / max(image.height - 1, 1)
+        color = tuple(round(a * (1 - mix) + b * mix) for a, b in zip(top, bottom))
+        draw.line((0, y, image.width, y), fill=color)
+
+
+def _orca_layer(rng: random.Random, archetype: int, extent: int, accent: tuple[int, ...]) -> Image.Image:
+    """Build a side-on orca from a curved silhouette and characteristic markings."""
+    layer = Image.new("RGBA", (extent, extent))
+    draw = ImageDraw.Draw(layer, "RGBA")
+    cx, cy = extent * .5, extent * .5
+    identity = random.Random(71_071 + archetype * 9_973)
+    length = identity.uniform(.63, .73) * extent * rng.uniform(.97, 1.03)
+    height = identity.uniform(.205, .245) * extent * rng.uniform(.97, 1.03)
+    nose = cx + length * .47
+    tail_root = cx - length * .40
+
+    # Organic body outline: blunt melon, tapered peduncle and curved back/belly.
+    points: list[tuple[float, float]] = []
+    for i in range(31):
+        u = i / 30
+        x = tail_root + (nose - tail_root) * u
+        profile = math.sin(math.pi * u) ** .58
+        head = 1 + .18 * math.exp(-((u - .84) / .16) ** 2)
+        y = cy - height * .5 * profile * head * (1 + rng.uniform(-.025, .025))
+        points.append((x, y))
+    for i in range(30, -1, -1):
+        u = i / 30
+        x = tail_root + (nose - tail_root) * u
+        profile = math.sin(math.pi * u) ** .68
+        belly = 1 + .16 * math.exp(-((u - .58) / .22) ** 2)
+        y = cy + height * .5 * profile * belly * (1 + rng.uniform(-.025, .025))
+        points.append((x, y))
+    black = rng.choice(((5, 14, 19, 255), (8, 18, 25, 255), (10, 20, 28, 255)))
+    draw.polygon(points, fill=black)
+
+    # Symmetrical tail flukes and a species-defining tall dorsal fin.
+    tail = length * rng.uniform(.12, .16)
+    draw.polygon([(tail_root + length*.025, cy), (tail_root-tail*.95, cy-tail*.68),
+                  (tail_root-tail*.78, cy-tail*.05), (tail_root-tail*.92, cy+tail*.62)], fill=black)
+    dorsal_x = cx - length * identity.uniform(.05, .13)
+    dorsal_h = height * identity.uniform(.82, 1.12)
+    draw.polygon([(dorsal_x-height*.13, cy-height*.42), (dorsal_x+height*.05, cy-dorsal_h),
+                  (dorsal_x+height*.23, cy-height*.38)], fill=black)
+
+    # Pectoral fin, white belly field, eye patch and grey saddle patch.
+    fin_x = cx + length * rng.uniform(.01, .13)
+    draw.polygon([(fin_x-height*.13, cy+height*.28), (fin_x+height*.03, cy+height*1.02),
+                  (fin_x+height*.42, cy+height*.34)], fill=(3, 11, 16, 245))
+    white = identity.choice(((229, 242, 236, 255), (210, 232, 229, 255), (239, 242, 226, 255)))
+    draw.ellipse((cx-length*.02, cy+height*.16, nose-length*.09, cy+height*.43), fill=white)
+    patch_x = nose - length * identity.uniform(.18, .22)
+    patch_y = cy - height * identity.uniform(.24, .31)
+    draw.ellipse((patch_x, patch_y, patch_x+length*.075, patch_y+height*.15), fill=white)
+    saddle = tuple(round(c*.58 + a*.42) for c, a in zip(black[:3], accent)) + (185,)
+    draw.ellipse((cx-length*.22, cy-height*.48, cx+length*.02, cy-height*.22), fill=saddle)
+
+    # Subtle highlight along the back reads well after downsampling.
+    draw.line(points[:25], fill=(*accent, 55), width=max(1, extent // 128))
+    return layer
 
 
 def render_whale(index: int, config: WhaleDatasetConfig = WhaleDatasetConfig()) -> Image.Image:
     rng = random.Random(config.seed + index * 1_000_003)
-    scale = config.render_scale
-    width = height = config.size * scale
-    background, body, highlight = rng.choice(PALETTES)
-    image = Image.new("RGB", (width, height), background)
-    draw = ImageDraw.Draw(image, "RGBA")
+    archetype = index % ORCA_ARCHETYPES
+    size = config.size * config.render_scale
+    top, bottom, accent = rng.choice(OCEANS)
+    image = Image.new("RGB", (size, size))
+    _gradient(image, top, bottom)
+    environment = Image.new("RGBA", (size, size))
+    draw = ImageDraw.Draw(environment, "RGBA")
 
-    # Quiet ocean depth and particulate bubbles.
-    for y in range(height):
-        shade = int(13 * y / height)
-        draw.line((0, y, width, y), fill=(*tuple(min(255, c + shade) for c in background), 255))
-    for _ in range(rng.randint(4, 11)):
-        x, y = rng.randrange(width), rng.randrange(height)
-        r = rng.choice((1, 2, 3, 4)) * scale / 2
-        draw.ellipse((x-r, y-r, x+r, y+r), outline=(*highlight, rng.randint(45, 110)), width=max(1, scale // 2))
+    # Environmental detail stays subordinate to the single-orca composition.
+    for _ in range(rng.randint(0, 2)):
+        x = rng.randint(-size//4, size)
+        spread = rng.randint(size//14, size//5)
+        draw.polygon([(x, 0), (x+spread, 0), (x+spread*2, size), (x-spread, size)], fill=(120, 220, 214, rng.randint(3, 8)))
+    for _ in range(rng.randint(0, 2)):
+        x = rng.randrange(size)
+        kelp_top = rng.uniform(.62, .86) * size
+        draw.line([(x, size), (x+rng.uniform(-.04,.04)*size, kelp_top)], fill=(3, 39, 39, rng.randint(50, 100)), width=max(2, size//80))
+    for _ in range(rng.randint(0, 5)):
+        x, y = rng.randrange(size), rng.randrange(size)
+        radius = rng.uniform(.002, .012) * size
+        draw.ellipse((x-radius, y-radius, x+radius, y+radius), outline=(*accent, rng.randint(20, 55)), width=max(1, config.render_scale//2))
+    environment = environment.filter(ImageFilter.GaussianBlur(rng.uniform(.2, .65) * config.render_scale))
+    image = Image.alpha_composite(image.convert("RGBA"), environment)
 
-    facing = rng.choice((-1, 1))
-    cx = rng.uniform(.48, .55) * width
-    cy = rng.uniform(.49, .57) * height
-    rx = rng.uniform(.25, .31) * width
-    ry = rng.uniform(.13, .18) * height
-    body_box = (cx-rx, cy-ry, cx+rx, cy+ry)
-    draw.ellipse(body_box, fill=(*body, 255))
-
-    # Tail points away from the rounded head.
-    tail_x = cx - facing * rx * .82
-    tail_root_y = cy
-    fin = rng.uniform(.12, .17) * width
-    tail_color = tuple(max(0, c - 7) for c in body)
-    draw.polygon([
-        (tail_x, tail_root_y), (tail_x-facing*fin*.78, tail_root_y-fin),
-        (tail_x-facing*fin*.9, tail_root_y-fin*.18),
-        (tail_x-facing*fin*.86, tail_root_y+fin*.82),
-    ], fill=(*tail_color, 255))
-
-    # Belly, flipper and eye establish a readable silhouette at 32 px.
-    belly = (cx-rx*.25, cy+ry*.1, cx+rx*facing*.85, cy+ry*.78)
-    draw.ellipse((min(belly[0], belly[2]), belly[1], max(belly[0], belly[2]), belly[3]), fill=(*highlight, 120))
-    flipper_x = cx + facing * rx * .05
-    draw.polygon([(flipper_x, cy+ry*.45), (flipper_x-facing*rx*.08, cy+ry*1.2), (flipper_x+facing*rx*.38, cy+ry*.55)], fill=(*tail_color, 235))
-    eye_x = cx + facing * rx * .57
-    eye_y = cy - ry * .25
-    er = max(2, scale * .75)
-    draw.ellipse((eye_x-er, eye_y-er, eye_x+er, eye_y+er), fill=(4, 18, 23, 255))
-    draw.ellipse((eye_x-er*.45, eye_y-er*.55, eye_x, eye_y-er*.1), fill=(240, 251, 245, 230))
-
-    # Optional blowhole spray and a soft vignette.
-    if rng.random() < .7:
-        spout_x = cx + facing * rx * .2
-        top = cy - ry * 1.8
-        draw.arc((spout_x-fin*.35, top, spout_x, cy-ry*.6), 195, 330, fill=(*highlight, 180), width=scale)
-        draw.arc((spout_x, top, spout_x+fin*.35, cy-ry*.6), 210, 345, fill=(*highlight, 150), width=scale)
-
-    image = image.filter(ImageFilter.GaussianBlur(rng.uniform(0, .28) * scale))
-    image = image.resize((config.size, config.size), Image.Resampling.LANCZOS)
-    if facing < 0:
-        image = image.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+    orca = _orca_layer(rng, archetype, size, accent)
+    identity = random.Random(91_091 + archetype * 8_191)
+    angle = identity.uniform(-8, 8) + rng.uniform(-2, 2)
+    orca = orca.rotate(angle, resample=Image.Resampling.BICUBIC, center=(size/2, size/2))
+    scale = rng.uniform(.94, 1.03)
+    if scale != 1:
+        resized = orca.resize((round(size*scale), round(size*scale)), Image.Resampling.LANCZOS)
+        positioned = Image.new("RGBA", (size, size))
+        positioned.alpha_composite(resized, ((size-resized.width)//2, (size-resized.height)//2))
+        orca = positioned
+    if rng.random() < .5: orca = orca.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+    offset = (rng.randint(-size//30, size//30), rng.randint(-size//28, size//28))
+    image.alpha_composite(orca, offset)
+    image = image.convert("RGB").resize((config.size, config.size), Image.Resampling.LANCZOS)
     return image
 
 
 class WhaleDataset(Dataset):
-    def __init__(self, config: WhaleDatasetConfig = WhaleDatasetConfig()):
-        self.config = config
-
-    def __len__(self) -> int:
-        return self.config.length
-
+    def __init__(self, config: WhaleDatasetConfig = WhaleDatasetConfig()): self.config = config
+    def __len__(self) -> int: return self.config.length
     def __getitem__(self, index: int):
         import torch
         pixels = np.asarray(render_whale(index, self.config), dtype=np.float32) / 127.5 - 1.0
-        return torch.from_numpy(pixels).permute(2, 0, 1)
+        condition = torch.zeros(ORCA_ARCHETYPES, dtype=torch.float32)
+        condition[index % ORCA_ARCHETYPES] = 1
+        return torch.from_numpy(pixels).permute(2, 0, 1), condition

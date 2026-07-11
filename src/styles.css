@@ -6,11 +6,9 @@ button, input, select { font: inherit; }
 button { color: inherit; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
 main { width: min(1120px, calc(100% - 40px)); margin: auto; padding: 72px 0 30px; }
-.hero { max-width: 720px; margin-bottom: 52px; }
-.eyebrow { display: block; color: var(--lime); font: 500 11px ui-monospace, monospace; letter-spacing: .16em; text-transform: uppercase; margin-bottom: 22px; }
-h1 { margin: 0; font-size: clamp(56px, 9.5vw, 112px); line-height: .82; letter-spacing: -.075em; font-weight: 500; }
-h1 em { color: transparent; -webkit-text-stroke: 1px #8bb5b5; font-style: normal; }
-.hero p { max-width: 560px; color: var(--muted); font-size: 16px; line-height: 1.75; margin: 32px 0 0; }
+.hero { max-width: 620px; margin-bottom: 30px; }
+h1 { margin: 0; color: var(--ink); font-size: clamp(20px, 2.5vw, 28px); line-height: 1.2; letter-spacing: -.025em; font-weight: 600; }
+.hero p { max-width: 560px; color: var(--muted); font-size: 14px; line-height: 1.65; margin: 12px 0 0; }
 .lab { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr); background: rgba(10, 40, 49, .72); border: 1px solid #1d4a51; box-shadow: 0 28px 80px #0007; backdrop-filter: blur(12px); }
 .viewer { padding: clamp(22px, 4vw, 48px); border-right: 1px solid #1d4a51; }
 .canvas-shell { position: relative; aspect-ratio: 1; overflow: hidden; background: #05151c; }
