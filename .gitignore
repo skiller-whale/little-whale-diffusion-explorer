@@ -5,5 +5,12 @@ public/ort/
 training/.venv/
 training/checkpoints/
 training/runs/
+training/data/
+training/outputs/
 __pycache__/
 *.pyc
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.tsbuildinfo
