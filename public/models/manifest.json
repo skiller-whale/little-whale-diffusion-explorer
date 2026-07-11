@@ -1,16 +1,34 @@
 {
-  "modelVersion": "3.0.0",
-  "architecture": "unconditional-v-ddpm",
-  "imageSize": 64,
-  "channels": 3,
-  "trainingTimesteps": 1000,
-  "timeEmbeddingSize": 192,
-  "conditioningSize": 16,
-  "conditioning": "seed-modulo-archetype-one-hot",
-  "schedule": "cosine",
-  "normalization": [-1, 1],
-  "supportedInferenceSteps": [10, 20, 30, 50],
-  "defaultInferenceSteps": 20,
-  "model": "whale-ddpm.onnx",
-  "sha256": "ba6c5e20a3667728324378f13dc633e59a2a0c6c4195e2a45c9a6155ccb94ea7"
+  "models": [
+    {
+      "modelVersion": "1.0.0",
+      "architecture": "unconditional-x0-ddpm",
+      "imageSize": 32,
+      "channels": 3,
+      "trainingTimesteps": 1000,
+      "timeEmbeddingSize": 160,
+      "schedule": "cosine",
+      "predictionType": "clean",
+      "outputName": "predicted_clean",
+      "inferenceStepRange": [1, 100],
+      "defaultInferenceSteps": 20,
+      "model": "whale-ddpm-32.onnx",
+      "sha256": "1dec39fce1b1a573adb13d5195ce5fd869d4dc9d81a658c08749ab4ea746de45"
+    },
+    {
+      "modelVersion": "4.0.0",
+      "architecture": "unconditional-v-ddpm",
+      "imageSize": 64,
+      "channels": 3,
+      "trainingTimesteps": 1000,
+      "timeEmbeddingSize": 192,
+      "schedule": "cosine",
+      "predictionType": "velocity",
+      "outputName": "predicted_velocity",
+      "inferenceStepRange": [1, 100],
+      "defaultInferenceSteps": 20,
+      "model": "whale-ddpm-64.onnx",
+      "sha256": "0438340789f8464c0871e916861880f7a3f53fe331353d00c6400ded4c3d3d1a"
+    }
+  ]
 }

@@ -85,9 +85,9 @@ def train(args: argparse.Namespace) -> None:
     recent_losses: deque[float] = deque(maxlen=100)
     model.train()
     for step in range(start + 1, args.train_steps + 1):
-        try: clean, conditioning = next(iterator)
-        except StopIteration: iterator = iter(loader); clean, conditioning = next(iterator)
-        clean, conditioning = clean.to(device), conditioning.to(device)
+        try: clean = next(iterator)
+        except StopIteration: iterator = iter(loader); clean = next(iterator)
+        clean = clean.to(device)
         times = torch.randint(0, 1_000, (clean.shape[0],), device=device)
         noise = torch.randn_like(clean)
         alpha = alphas[times, None, None, None]
@@ -95,7 +95,7 @@ def train(args: argparse.Namespace) -> None:
         optimizer.zero_grad(set_to_none=True)
         with torch.autocast(device_type=device.type, enabled=device.type in ("cuda", "mps")):
             velocity = alpha.sqrt() * noise - (1 - alpha).sqrt() * clean
-            loss = torch.mean((model(noisy, embedding(times), conditioning) - velocity) ** 2)
+            loss = torch.mean((model(noisy, embedding(times)) - velocity) ** 2)
         scaler.scale(loss).backward(); scaler.unscale_(optimizer)
         nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         scaler.step(optimizer); scaler.update(); scheduler.step()
@@ -121,8 +121,8 @@ def export(args: argparse.Namespace) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     with torch.no_grad():
         torch.onnx.export(
-            model, (torch.randn(1, 3, 64, 64), torch.randn(1, 192), torch.eye(16)[:1]), output,
-            input_names=["sample", "timestep_embedding", "conditioning"], output_names=["predicted_velocity"],
+            model, (torch.randn(1, 3, 64, 64), torch.randn(1, 192)), output,
+            input_names=["sample", "timestep_embedding"], output_names=["predicted_velocity"],
             opset_version=18, dynamo=False, do_constant_folding=True,
         )
     size = output.stat().st_size
@@ -138,13 +138,12 @@ def sample(args: argparse.Namespace) -> None:
     model.load_state_dict(state[args.weights])
     generator = torch.Generator(device=device).manual_seed(args.seed)
     current = torch.randn(args.count, 3, 64, 64, device=device, generator=generator)
-    conditioning = torch.eye(16, device=device)[torch.arange(args.count, device=device) % 16]
     alphas = cosine_alphas().to(device)
     times = torch.linspace(args.start_timestep, 0, args.steps).round().long().tolist()
     for index, timestep in enumerate(times):
         previous = times[index + 1] if index + 1 < len(times) else -1
         time = torch.full((args.count,), timestep, device=device)
-        velocity = model(current, embedding(time), conditioning)
+        velocity = model(current, embedding(time))
         alpha = alphas[timestep]
         previous_alpha = alphas[previous] if previous >= 0 else torch.tensor(1., device=device)
         clean = (alpha.sqrt() * current - (1-alpha).sqrt() * velocity).clamp(-1, 1)

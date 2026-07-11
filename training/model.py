@@ -45,11 +45,10 @@ class Attention(nn.Module):
 
 class WhaleUNet(nn.Module):
     """Wider at 64 px, capped at 128 channels to remain practical in WASM."""
-    def __init__(self, time_dim: int = 192, condition_dim: int = 16):
+    def __init__(self, time_dim: int = 192):
         super().__init__()
         c1, c2, c3, c4 = 32, 64, 96, 128
         self.time_mlp = nn.Sequential(nn.Linear(time_dim, time_dim), nn.SiLU(), nn.Linear(time_dim, time_dim))
-        self.condition_mlp = nn.Sequential(nn.Linear(condition_dim, time_dim), nn.SiLU(), nn.Linear(time_dim, time_dim))
         self.input = nn.Conv2d(3, c1, 3, padding=1)
         self.d1a, self.d1b = ResBlock(c1, c1, time_dim), ResBlock(c1, c1, time_dim)
         self.down1 = nn.Conv2d(c1, c2, 4, stride=2, padding=1)
@@ -69,8 +68,8 @@ class WhaleUNet(nn.Module):
         self.output_norm = nn.GroupNorm(groups(c1), c1)
         self.output = nn.Conv2d(c1, 3, 3, padding=1)
 
-    def forward(self, sample: torch.Tensor, timestep_embedding: torch.Tensor, conditioning: torch.Tensor) -> torch.Tensor:
-        time = self.time_mlp(timestep_embedding) + self.condition_mlp(conditioning)
+    def forward(self, sample: torch.Tensor, timestep_embedding: torch.Tensor) -> torch.Tensor:
+        time = self.time_mlp(timestep_embedding)
         x1 = self.d1b(self.d1a(self.input(sample), time), time)
         x2 = self.d2b(self.d2a(self.down1(x1), time), time)
         x3 = self.d3b(self.d3a(self.down2(x2), time), time)

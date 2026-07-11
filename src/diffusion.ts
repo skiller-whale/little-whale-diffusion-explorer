@@ -1,8 +1,23 @@
-export const IMAGE_SIZE = 64;
 export const CHANNELS = 3;
 export const TRAINING_STEPS = 1000;
-export const TIME_EMBEDDING_SIZE = 192;
-export const ORCA_ARCHETYPES = 16;
+
+export type PredictionType = "clean" | "velocity";
+
+export interface ModelConfig {
+  id: "orca32" | "orca64";
+  label: string;
+  modelUrl: string;
+  imageSize: number;
+  timeEmbeddingSize: number;
+  predictionType: PredictionType;
+  outputName: "predicted_clean" | "predicted_velocity";
+  defaultSteps: number;
+}
+
+export const MODELS: ModelConfig[] = [
+  { id: "orca32", label: "32 × 32", modelUrl: "/models/whale-ddpm-32.onnx", imageSize: 32, timeEmbeddingSize: 160, predictionType: "clean", outputName: "predicted_clean", defaultSteps: 20 },
+  { id: "orca64", label: "64 × 64", modelUrl: "/models/whale-ddpm-64.onnx", imageSize: 64, timeEmbeddingSize: 192, predictionType: "velocity", outputName: "predicted_velocity", defaultSteps: 20 },
+];
 
 export function mulberry32(seed: number): () => number {
   let value = seed >>> 0;
@@ -29,22 +44,21 @@ export function gaussianNoise(length: number, seed: number): Float32Array {
 
 export function cosineAlphaCumprod(steps = TRAINING_STEPS, offset = 0.008): Float32Array {
   const values = new Float32Array(steps);
-  const f0 = Math.cos((offset / (1 + offset)) * Math.PI * 0.5) ** 2;
+  const f0 = Math.cos((offset / (1 + offset)) * Math.PI * .5) ** 2;
   for (let t = 0; t < steps; t++) {
     const x = (t + 1) / steps;
-    values[t] = Math.max(Math.cos(((x + offset) / (1 + offset)) * Math.PI * 0.5) ** 2 / f0, 1e-7);
+    values[t] = Math.max(Math.cos(((x + offset) / (1 + offset)) * Math.PI * .5) ** 2 / f0, 1e-7);
   }
   return values;
 }
 
 export function inferenceTimesteps(count: number, trainingSteps = TRAINING_STEPS): number[] {
-  if (count < 2) throw new Error("At least two denoising steps are required");
-  return Array.from({ length: count }, (_, i) =>
-    Math.round((trainingSteps - 1) * (1 - i / (count - 1))),
-  );
+  if (count < 1) throw new Error("At least one denoising step is required");
+  if (count === 1) return [trainingSteps - 1];
+  return Array.from({ length: count }, (_, i) => Math.round((trainingSteps - 1) * (1 - i / (count - 1))));
 }
 
-export function timestepEmbedding(timestep: number, size = TIME_EMBEDDING_SIZE): Float32Array {
+export function timestepEmbedding(timestep: number, size: number): Float32Array {
   const half = size / 2;
   const embedding = new Float32Array(size);
   for (let i = 0; i < half; i++) {
@@ -55,41 +69,29 @@ export function timestepEmbedding(timestep: number, size = TIME_EMBEDDING_SIZE):
   return embedding;
 }
 
-export function seedConditioning(seed: number): Float32Array {
-  const conditioning = new Float32Array(ORCA_ARCHETYPES);
-  conditioning[(seed >>> 0) % ORCA_ARCHETYPES] = 1;
-  return conditioning;
-}
-
-export function ddimStep(
-  sample: Float32Array,
-  predictedVelocity: Float32Array,
-  timestep: number,
-  previousTimestep: number,
-  alphas = cosineAlphaCumprod(),
-): Float32Array {
+export function ddimStep(sample: Float32Array, prediction: Float32Array, timestep: number, previousTimestep: number, predictionType: PredictionType, alphas = cosineAlphaCumprod()): Float32Array {
   const alpha = alphas[timestep];
   const previousAlpha = previousTimestep >= 0 ? alphas[previousTimestep] : 1;
-  const sqrtAlpha = Math.sqrt(alpha);
-  const sqrtOneMinusAlpha = Math.sqrt(Math.max(1 - alpha, 0));
-  const sqrtPreviousAlpha = Math.sqrt(previousAlpha);
-  const sqrtPreviousOneMinusAlpha = Math.sqrt(Math.max(1 - previousAlpha, 0));
+  const sqrtAlpha = Math.sqrt(alpha), sqrtNoise = Math.sqrt(Math.max(1 - alpha, 0));
+  const sqrtPreviousAlpha = Math.sqrt(previousAlpha), sqrtPreviousNoise = Math.sqrt(Math.max(1 - previousAlpha, 0));
   const output = new Float32Array(sample.length);
   for (let i = 0; i < sample.length; i++) {
-    const clean = Math.max(-1, Math.min(1, sqrtAlpha * sample[i] - sqrtOneMinusAlpha * predictedVelocity[i]));
-    const noise = sqrtOneMinusAlpha * sample[i] + sqrtAlpha * predictedVelocity[i];
-    output[i] = sqrtPreviousAlpha * clean + sqrtPreviousOneMinusAlpha * noise;
+    const clean = Math.max(-1, Math.min(1, predictionType === "velocity" ? sqrtAlpha * sample[i] - sqrtNoise * prediction[i] : prediction[i]));
+    const noise = predictionType === "velocity" ? sqrtNoise * sample[i] + sqrtAlpha * prediction[i] : (sample[i] - sqrtAlpha * clean) / Math.max(sqrtNoise, 1e-7);
+    output[i] = sqrtPreviousAlpha * clean + sqrtPreviousNoise * noise;
   }
   return output;
 }
 
-export function tensorToRgba(tensor: Float32Array, size = IMAGE_SIZE): Uint8ClampedArray {
-  const plane = size * size;
-  const rgba = new Uint8ClampedArray(plane * 4);
+export function forwardDiffuse(clean: Float32Array, noise: Float32Array, timestep: number, alphas = cosineAlphaCumprod()): Float32Array {
+  const a = Math.sqrt(alphas[timestep]), n = Math.sqrt(1 - alphas[timestep]);
+  return clean.map((value, index) => a * value + n * noise[index]);
+}
+
+export function tensorToRgba(tensor: Float32Array, size: number): Uint8ClampedArray {
+  const plane = size * size, rgba = new Uint8ClampedArray(plane * 4);
   for (let i = 0; i < plane; i++) {
-    rgba[i * 4] = Math.round((Math.max(-1, Math.min(1, tensor[i])) + 1) * 127.5);
-    rgba[i * 4 + 1] = Math.round((Math.max(-1, Math.min(1, tensor[i + plane])) + 1) * 127.5);
-    rgba[i * 4 + 2] = Math.round((Math.max(-1, Math.min(1, tensor[i + plane * 2])) + 1) * 127.5);
+    for (let channel = 0; channel < 3; channel++) rgba[i * 4 + channel] = Math.round((Math.max(-1, Math.min(1, tensor[i + plane * channel])) + 1) * 127.5);
     rgba[i * 4 + 3] = 255;
   }
   return rgba;

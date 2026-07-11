@@ -119,16 +119,17 @@ def render_whale(index: int, config: WhaleDatasetConfig = WhaleDatasetConfig()) 
 
     orca = _orca_layer(rng, archetype, size, accent)
     identity = random.Random(91_091 + archetype * 8_191)
-    angle = identity.uniform(-8, 8) + rng.uniform(-2, 2)
+    angle = identity.uniform(-22, 22) + rng.uniform(-8, 8)
     orca = orca.rotate(angle, resample=Image.Resampling.BICUBIC, center=(size/2, size/2))
-    scale = rng.uniform(.94, 1.03)
+    # Broad scale distribution biased toward large, occasionally cropped subjects.
+    scale = .82 + .40 * math.sqrt(rng.random())
     if scale != 1:
         resized = orca.resize((round(size*scale), round(size*scale)), Image.Resampling.LANCZOS)
         positioned = Image.new("RGBA", (size, size))
         positioned.alpha_composite(resized, ((size-resized.width)//2, (size-resized.height)//2))
         orca = positioned
     if rng.random() < .5: orca = orca.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
-    offset = (rng.randint(-size//30, size//30), rng.randint(-size//28, size//28))
+    offset = (rng.randint(-size//7, size//7), rng.randint(-size//6, size//6))
     image.alpha_composite(orca, offset)
     image = image.convert("RGB").resize((config.size, config.size), Image.Resampling.LANCZOS)
     return image
@@ -140,6 +141,4 @@ class WhaleDataset(Dataset):
     def __getitem__(self, index: int):
         import torch
         pixels = np.asarray(render_whale(index, self.config), dtype=np.float32) / 127.5 - 1.0
-        condition = torch.zeros(ORCA_ARCHETYPES, dtype=torch.float32)
-        condition[index % ORCA_ARCHETYPES] = 1
-        return torch.from_numpy(pixels).permute(2, 0, 1), condition
+        return torch.from_numpy(pixels).permute(2, 0, 1)
