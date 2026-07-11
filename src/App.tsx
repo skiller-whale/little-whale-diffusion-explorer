@@ -172,7 +172,7 @@ function TrainingIllustrator({ config }: { config: ModelConfig }) {
     <h2 id={`${config.id}-training`}>Training the {config.label} model</h2>
     <p className="section-note">We procedurally generate illustrations of whales, add varying amounts of noise, and train the model to predict the information needed to recover the original image.</p>
     <div className="table-scroll"><table><thead><tr>{TRAINING_TIMESTEPS.map((t, index) => <th key={t}>{index === 0 ? "Clean" : `t ${t}`}</th>)}</tr></thead>
-      <tbody>{Array.from({ length: 5 }, (_, row) => <tr key={row}>{TRAINING_TIMESTEPS.map((timestep, column) => <td key={column}><img className="training-pixel" src={`/training/32/${row}-${column}.png`} alt={`Original 32 pixel training example ${row + 1}, ${column === 0 ? "clean" : `noise timestep ${timestep}`}`} /></td>)}</tr>)}</tbody></table></div>
+      <tbody>{Array.from({ length: 5 }, (_, row) => <tr key={row}>{TRAINING_TIMESTEPS.map((timestep, column) => <td key={column}><img className="training-pixel" src={`${import.meta.env.BASE_URL}training/32/${row}-${column}.png`} alt={`Original 32 pixel training example ${row + 1}, ${column === 0 ? "clean" : `noise timestep ${timestep}`}`} /></td>)}</tr>)}</tbody></table></div>
   </section>;
   const rows = Array.from({ length: 5 }, (_, row) => {
     const clean = makeOrca(config.imageSize, row);
@@ -189,7 +189,7 @@ function TrainingIllustrator({ config }: { config: ModelConfig }) {
 
 export function App() {
   return <main>
-    <header><h1>Little Whale Diffusion</h1></header>
+    <header><h1>Little Whale Diffusion Explorer</h1></header>
     <TrainingIllustrator config={MODELS[0]} />
     <DiffusionGenerator config={MODELS[0]} />
     <TrainingIllustrator config={MODELS[1]} />

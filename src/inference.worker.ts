@@ -11,7 +11,7 @@ const send = (message: WorkerResponse, transfer: Transferable[] = []) => context
 
 async function initialize(next: ModelConfig) {
   config = next;
-  ort.env.wasm.wasmPaths = `${location.origin}/ort/`;
+  ort.env.wasm.wasmPaths = `${location.origin}${next.assetBaseUrl}ort/`;
   ort.env.wasm.numThreads = crossOriginIsolated ? Math.min(4, Math.max(1, navigator.hardwareConcurrency - 1)) : 1;
   send({ type: "status", message: "Loading model" });
   if ("gpu" in navigator) {

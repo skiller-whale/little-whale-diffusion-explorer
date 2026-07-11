@@ -7,6 +7,7 @@ export interface ModelConfig {
   id: "orca32" | "orca64";
   label: string;
   modelUrl: string;
+  assetBaseUrl: string;
   imageSize: number;
   timeEmbeddingSize: number;
   predictionType: PredictionType;
@@ -15,8 +16,8 @@ export interface ModelConfig {
 }
 
 export const MODELS: ModelConfig[] = [
-  { id: "orca32", label: "32 × 32", modelUrl: "/models/whale-ddpm-32.onnx", imageSize: 32, timeEmbeddingSize: 160, predictionType: "clean", outputName: "predicted_clean", defaultSteps: 20 },
-  { id: "orca64", label: "64 × 64", modelUrl: "/models/whale-ddpm-64.onnx", imageSize: 64, timeEmbeddingSize: 192, predictionType: "velocity", outputName: "predicted_velocity", defaultSteps: 20 },
+  { id: "orca32", label: "32 × 32", modelUrl: `${import.meta.env.BASE_URL}models/whale-ddpm-32.onnx`, assetBaseUrl: import.meta.env.BASE_URL, imageSize: 32, timeEmbeddingSize: 160, predictionType: "clean", outputName: "predicted_clean", defaultSteps: 20 },
+  { id: "orca64", label: "64 × 64", modelUrl: `${import.meta.env.BASE_URL}models/whale-ddpm-64.onnx`, assetBaseUrl: import.meta.env.BASE_URL, imageSize: 64, timeEmbeddingSize: 192, predictionType: "velocity", outputName: "predicted_velocity", defaultSteps: 20 },
 ];
 
 export function mulberry32(seed: number): () => number {

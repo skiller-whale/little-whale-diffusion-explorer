@@ -1,4 +1,6 @@
-# Little Whale Diffusion
+# Little Whale Diffusion Explorer
+
+Live site: <https://skiller-whale.github.io/little-whale-diffusion-explorer/>
 
 A lightweight Bun and React teaching demo for two unconditional diffusion models running entirely in the browser. It compares the original 32×32 clean-image-predicting model with the newer 64×64 velocity-predicting model, and illustrates the forward-noising process used during training.
 
