@@ -7,6 +7,8 @@ const context: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGl
 let session: ort.InferenceSession | undefined;
 let config: ModelConfig | undefined;
 let generation = 0;
+let running = false;
+let pending: Extract<WorkerRequest, { type: "generate" }> | undefined;
 const send = (message: WorkerResponse, transfer: Transferable[] = []) => context.postMessage(message, transfer);
 
 async function initialize(next: ModelConfig) {
@@ -22,9 +24,8 @@ async function initialize(next: ModelConfig) {
   send({ type: "ready" });
 }
 
-async function generate(id: number, seed: number, steps: number) {
+async function generate(id: number, seed: number, steps: number, token: number) {
   if (!session || !config) throw new Error("The model is not ready");
-  const token = ++generation;
   const started = performance.now(), size = config.imageSize;
   const shape = [1, CHANNELS, size, size];
   let sample = gaussianNoise(CHANNELS * size * size, seed);
@@ -47,8 +48,35 @@ async function generate(id: number, seed: number, steps: number) {
   if (token === generation) send({ type: "complete", id, elapsedMs: performance.now() - started });
 }
 
+async function drainGenerationQueue() {
+  if (running) return;
+  running = true;
+  try {
+    while (pending) {
+      const request = pending;
+      pending = undefined;
+      const token = generation;
+      try {
+        await generate(request.id, request.seed, request.steps, token);
+      } catch (error) {
+        if (token === generation) send({ type: "error", message: String((error as Error)?.message ?? error) });
+      }
+    }
+  } finally {
+    running = false;
+    // A message can arrive after the loop condition but before `running` resets.
+    if (pending) void drainGenerationQueue();
+  }
+}
+
+function queueGeneration(request: Extract<WorkerRequest, { type: "generate" }>) {
+  generation++;
+  pending = request;
+  void drainGenerationQueue();
+}
+
 context.onmessage = ({ data }: MessageEvent<WorkerRequest>) => {
   if (data.type === "initialize") void initialize(data.config).catch((error) => send({ type: "error", message: String(error?.message ?? error) }));
-  if (data.type === "generate") void generate(data.id, data.seed, data.steps).catch((error) => send({ type: "error", message: String(error?.message ?? error) }));
-  if (data.type === "cancel") generation++;
+  if (data.type === "generate") queueGeneration(data);
+  if (data.type === "cancel") { generation++; pending = undefined; }
 };
