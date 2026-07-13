@@ -1,0 +1,117 @@
+{
+  "model": "FLUX.1 schnell",
+  "size": 512,
+  "rows": [
+    {
+      "title": "Watercolour orca at various step counts",
+      "variants": [
+        {
+          "id": "watercolor-1",
+          "label": "1 step",
+          "prompt": "a watercolor illustration of an orca whale swimming through a deep teal ocean",
+          "seed": 42,
+          "steps": 1,
+          "frameCount": 2
+        },
+        {
+          "id": "watercolor-2",
+          "label": "2 steps",
+          "prompt": "a watercolor illustration of an orca whale swimming through a deep teal ocean",
+          "seed": 42,
+          "steps": 2,
+          "frameCount": 3
+        },
+        {
+          "id": "watercolor-4",
+          "label": "4 steps",
+          "prompt": "a watercolor illustration of an orca whale swimming through a deep teal ocean",
+          "seed": 42,
+          "steps": 4,
+          "frameCount": 5
+        },
+        {
+          "id": "watercolor-20",
+          "label": "20 steps",
+          "prompt": "a watercolor illustration of an orca whale swimming through a deep teal ocean",
+          "seed": 42,
+          "steps": 20,
+          "frameCount": 21
+        }
+      ]
+    },
+    {
+      "title": "Photograph orca at various step counts",
+      "variants": [
+        {
+          "id": "photo-1",
+          "label": "1 step",
+          "prompt": "a photograph of an orca breaching beside a small fishing boat at dawn, spray catching the light",
+          "seed": 7,
+          "steps": 1,
+          "frameCount": 2
+        },
+        {
+          "id": "photo-2",
+          "label": "2 steps",
+          "prompt": "a photograph of an orca breaching beside a small fishing boat at dawn, spray catching the light",
+          "seed": 7,
+          "steps": 2,
+          "frameCount": 3
+        },
+        {
+          "id": "photo-4",
+          "label": "4 steps",
+          "prompt": "a photograph of an orca breaching beside a small fishing boat at dawn, spray catching the light",
+          "seed": 7,
+          "steps": 4,
+          "frameCount": 5
+        },
+        {
+          "id": "photo-20",
+          "label": "20 steps",
+          "prompt": "a photograph of an orca breaching beside a small fishing boat at dawn, spray catching the light",
+          "seed": 7,
+          "steps": 20,
+          "frameCount": 21
+        }
+      ]
+    },
+    {
+      "title": "Various prompts at 4 steps",
+      "variants": [
+        {
+          "id": "stained-glass",
+          "label": "glass",
+          "prompt": "an orca made of stained glass, backlit in a cathedral window",
+          "seed": 11,
+          "steps": 4,
+          "frameCount": 5
+        },
+        {
+          "id": "blueprint",
+          "label": "blueprint",
+          "prompt": "a blueprint schematic of a mechanical orca, white lines on blue paper",
+          "seed": 23,
+          "steps": 4,
+          "frameCount": 5
+        },
+        {
+          "id": "origami",
+          "label": "origami",
+          "prompt": "an origami orca folded from old nautical charts, studio photograph",
+          "seed": 31,
+          "steps": 4,
+          "frameCount": 5
+        },
+        {
+          "id": "neon-city",
+          "label": "neon city",
+          "prompt": "a neon-lit orca gliding above a rain-slick city street at night",
+          "seed": 55,
+          "steps": 4,
+          "frameCount": 5
+        }
+      ]
+    }
+  ]
+}
