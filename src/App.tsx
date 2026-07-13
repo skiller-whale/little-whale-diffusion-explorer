@@ -194,6 +194,14 @@ function fluxFrameUrl(variantId: string, index: number) {
   return `${import.meta.env.BASE_URL}flux/${variantId}/${String(index).padStart(3, "0")}.webp`;
 }
 
+function loadFluxFrames(entry: FluxVariant) {
+  return Promise.all(Array.from({ length: entry.frameCount }, (_, index) => new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = resolve; image.onerror = reject;
+    image.src = fluxFrameUrl(entry.id, index);
+  })));
+}
+
 function FluxShowcase() {
   const playbackRef = useRef<number | undefined>(undefined);
   const selectTokenRef = useRef(0);
@@ -210,11 +218,7 @@ function FluxShowcase() {
     if (!loadedRef.current.has(next.id)) {
       setPhase("loading");
       try {
-        await Promise.all(Array.from({ length: next.frameCount }, (_, index) => new Promise((resolve, reject) => {
-          const image = new Image();
-          image.onload = resolve; image.onerror = reject;
-          image.src = fluxFrameUrl(next.id, index);
-        })));
+        await loadFluxFrames(next);
         loadedRef.current.add(next.id);
       } catch {
         if (token === selectTokenRef.current) setPhase("error");
@@ -236,7 +240,15 @@ function FluxShowcase() {
         if (cancelled) return;
         setManifest(data);
         const variants = data.rows.flatMap((row) => row.variants);
-        select(variants.find((entry) => entry.steps === 20) ?? variants[0]);
+        await select(variants.find((entry) => entry.steps === 20) ?? variants[0]);
+        for (const entry of variants) {
+          if (cancelled) return;
+          if (loadedRef.current.has(entry.id)) continue;
+          try {
+            await loadFluxFrames(entry);
+            loadedRef.current.add(entry.id);
+          } catch { /* a click on this variant retries and surfaces the error */ }
+        }
       } catch {
         if (!cancelled) setPhase("error");
       }
