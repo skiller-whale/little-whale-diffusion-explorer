@@ -281,7 +281,7 @@ function FluxShowcase() {
 
   const last = variant ? variant.frameCount - 1 : 1;
   return <section className="model-section" aria-labelledby="flux-heading">
-    <h2 id="flux-heading">Modern diffusion model (FLUX.1 Schnell, 2024)</h2>
+    <h2 id="flux-heading">Modern image model (FLUX.1 Schnell, 2024)</h2>
     <div className="generator-card">
       <div className="controls">
         {manifest && <div className="flux-thumb-groups">
