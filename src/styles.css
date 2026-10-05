@@ -42,8 +42,12 @@ canvas { display: block; image-rendering: pixelated; }
 @media (max-width: 760px) { main { padding-top: 34px; } header { margin-bottom: 40px; } section { margin-top: 64px; } .generator-card { grid-template-columns: 1fr; } .controls { border-right: 0; border-bottom: 1px solid var(--line); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
 
-/* Experimental "be the model" denoising game */
+/* "Train like a diffusion model" warm-up */
 .denoise-canvas { cursor: crosshair; }
+.denoise-canvas:focus-visible { outline: 2px solid var(--lime); outline-offset: -2px; }
+.denoise-cursor { position: absolute; outline: 2px solid var(--lime); box-shadow: inset 0 0 0 1px #061923; pointer-events: none; }
+.denoise-error { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 18px 0 0; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .denoise-done { margin: 22px 0 0; color: var(--lime); font-size: 14px; }
 .denoise-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 26px 0 32px; }
 .denoise-actions .run { grid-column: 1 / -1; white-space: nowrap; }

@@ -1,116 +1,136 @@
 import { useEffect, useRef, useState } from "react";
+import { composite, konamiDetector, LEVELS, makeNoise, pixelAt, type Rgb, SIZE } from "./denoiseLogic";
 
-const SIZE = 32;
-// Each level: which clean training whale to use, and how many pixels to corrupt.
-// Noise grows about 4x per level; the last level leaves a few clean pixels showing through.
-const LEVELS = [{ whale: 0, noise: 4 }, { whale: 1, noise: 16 }, { whale: 2, noise: 64 }, { whale: 3, noise: 256 }, { whale: 4, noise: 900 }];
+const cleanWhales = new Map<number, Promise<Uint8ClampedArray>>();
 
 function loadClean(whale: number): Promise<Uint8ClampedArray> {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = canvas.height = SIZE;
-      const ctx = canvas.getContext("2d")!;
-      ctx.drawImage(image, 0, 0);
-      resolve(ctx.getImageData(0, 0, SIZE, SIZE).data);
-    };
-    image.onerror = reject;
-    image.src = `${import.meta.env.BASE_URL}training/32/${whale}-0.png`;
-  });
+  if (!cleanWhales.has(whale)) {
+    const loading = new Promise<Uint8ClampedArray>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = SIZE;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(image, 0, 0);
+        resolve(ctx.getImageData(0, 0, SIZE, SIZE).data);
+      };
+      image.onerror = () => reject(new Error(`Could not load training whale ${whale}`));
+      image.src = `${import.meta.env.BASE_URL}training/32/${whale}-0.png`;
+    });
+    loading.catch(() => cleanWhales.delete(whale)); // let a retry fetch it again
+    cleanWhales.set(whale, loading);
+  }
+  return cleanWhales.get(whale)!;
 }
 
-const MODIFIERS = new Set(["shift", "capslock", "control", "alt", "meta"]);
-const KONAMI = ["arrowup", "arrowup", "arrowdown", "arrowdown", "arrowleft", "arrowright", "arrowleft", "arrowright", "b", "a"];
-
-function pickNoisy(count: number): Set<number> {
-  const picked = new Set<number>();
-  while (picked.size < count) picked.add(Math.floor(Math.random() * SIZE * SIZE));
-  return picked;
-}
+const ARROWS: Record<string, [number, number]> = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+const misses = (n: number) => `${n} miss${n === 1 ? "" : "es"}`;
 
 export function DenoiseGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const loadId = useRef(0);
   const [level, setLevel] = useState(0);
   const [clean, setClean] = useState<Uint8ClampedArray>();
-  const [noise, setNoise] = useState<Map<number, [number, number, number]>>(new Map());
+  const [failed, setFailed] = useState(false);
+  const [noise, setNoise] = useState<Map<number, Rgb>>(new Map());
   const [remaining, setRemaining] = useState<Set<number>>(new Set());
-  const [misses, setMisses] = useState(0);
+  const [missCount, setMissCount] = useState(0);
+  const [cursor, setCursor] = useState(SIZE * SIZE / 2 + SIZE / 2);
+  const [showCursor, setShowCursor] = useState(false);
   const [skipUnlocked, setSkipUnlocked] = useState(false);
   const [skipJustUnlocked, setSkipJustUnlocked] = useState(false);
 
   function start(levelIndex: number) {
-    const { whale, noise: count } = LEVELS[levelIndex];
-    setLevel(levelIndex); setMisses(0); setClean(undefined);
-    loadClean(whale).then((pixels) => {
-      const noisy = pickNoisy(count);
-      setNoise(new Map([...noisy].map((i) => [i, [0, 1, 2].map(() => Math.floor(Math.random() * 256)) as [number, number, number]])));
-      setRemaining(noisy);
+    const id = ++loadId.current; // a slower, older load must not overwrite a newer level
+    setLevel(levelIndex); setMissCount(0); setClean(undefined); setFailed(false);
+    loadClean(LEVELS[levelIndex].whale).then((pixels) => {
+      if (id !== loadId.current) return;
+      const levelNoise = makeNoise(LEVELS[levelIndex].noise);
+      setNoise(levelNoise);
+      setRemaining(new Set(levelNoise.keys()));
       setClean(pixels);
-    });
+    }, () => { if (id === loadId.current) setFailed(true); });
   }
 
   useEffect(() => { start(0); }, []);
 
-  // Undocumented: the Konami code reveals a Skip level button, for coaches fast-forwarding a demo.
+  // Deliberately unadvertised: the Konami code reveals a Skip level button, for coaches fast-forwarding a demo.
   useEffect(() => {
-    const recent: string[] = [];
+    const matches = konamiDetector();
     const onKey = (event: KeyboardEvent) => {
-      const key = event.key.toLowerCase();
-      if (MODIFIERS.has(key)) return; // so Shift+B / Shift+A (or Caps Lock) still count
-      recent.push(key);
-      if (recent.length > KONAMI.length) recent.shift();
-      if (recent.join() === KONAMI.join()) { setSkipUnlocked(true); setSkipJustUnlocked(true); window.removeEventListener("keydown", onKey); }
+      if (!matches(event.key)) return;
+      setSkipUnlocked(true); setSkipJustUnlocked(true);
+      window.removeEventListener("keydown", onKey);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  useEffect(() => {
+    if (clean) canvasRef.current?.getContext("2d")?.putImageData(new ImageData(composite(clean, noise, remaining), SIZE, SIZE), 0, 0);
+  }, [clean, noise, remaining]);
+
+  const done = !!clean && remaining.size === 0;
+
+  function pick(index: number) {
+    if (!clean || done) return;
+    if (!remaining.has(index)) { setMissCount((m) => m + 1); return; }
+    const next = new Set(remaining); next.delete(index); setRemaining(next);
+  }
 
   function skip() {
     if (level < LEVELS.length - 1) start(level + 1);
     else setRemaining(new Set());
   }
 
-  useEffect(() => {
-    if (!clean) return;
-    const pixels = new Uint8ClampedArray(clean);
-    for (const i of remaining) pixels.set(noise.get(i)!, i * 4);
-    canvasRef.current?.getContext("2d")?.putImageData(new ImageData(pixels, SIZE, SIZE), 0, 0);
-  }, [clean, noise, remaining]);
-
-  function click(event: React.MouseEvent<HTMLCanvasElement>) {
-    if (!clean || remaining.size === 0) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = Math.floor((event.clientX - rect.left) / rect.width * SIZE);
-    const y = Math.floor((event.clientY - rect.top) / rect.height * SIZE);
-    const index = y * SIZE + x;
-    if (!remaining.has(index)) { setMisses((m) => m + 1); return; }
-    const next = new Set(remaining); next.delete(index); setRemaining(next);
+  function onCanvasKey(event: React.KeyboardEvent<HTMLCanvasElement>) {
+    const move = ARROWS[event.key];
+    if (move) {
+      event.preventDefault(); // arrows move the cursor instead of scrolling (the Konami listener still sees them)
+      const x = Math.min(SIZE - 1, Math.max(0, cursor % SIZE + move[0]));
+      const y = Math.min(SIZE - 1, Math.max(0, Math.floor(cursor / SIZE) + move[1]));
+      setCursor(y * SIZE + x); setShowCursor(true);
+    } else if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      setShowCursor(true); pick(cursor);
+    }
   }
 
-  const total = LEVELS[level].noise, found = total - remaining.size, done = !!clean && remaining.size === 0;
-  const last = level === LEVELS.length - 1;
+  const total = LEVELS[level].noise, found = total - remaining.size, last = level === LEVELS.length - 1;
+  const status = failed ? "Couldn't load" : !clean ? "Loading" : done ? "Whale restored" : misses(missCount);
+  const announcement = failed ? "The whale image couldn't be loaded."
+    : !clean ? `Loading level ${level + 1}.`
+    : done ? `${last ? "All levels done" : "Whale restored"} with ${misses(missCount)}.`
+    : `Level ${level + 1} of ${LEVELS.length}: ${found} of ${total} noisy pixels found, ${misses(missCount)}.`;
+
   return <section className="model-section denoise-game" aria-labelledby="denoise-heading">
     <h2 id="denoise-heading">Train like a diffusion model</h2>
-    <p className="section-note">Some pixels in this whale have been replaced with random noise. Click every noisy pixel to restore the original image.</p>
+    <p className="section-note" id="denoise-instructions">Some pixels in this whale have been replaced with random noise. Click every noisy pixel to restore the original image.</p>
     <div className="generator-card">
       <div className="controls">
-        <div className="timeline-heading"><span>Level {level + 1} of {LEVELS.length}</span><strong>{found} / {total} found</strong></div>
-        <div className="status"><i className={`dot ${done ? "ready" : "playing"}`} />{done ? "Whale restored" : `${misses} miss${misses === 1 ? "" : "es"}`}</div>
-        {done && <p className="denoise-done"><span aria-hidden>✓</span> {last ? "All levels done." : `Restored with ${misses} miss${misses === 1 ? "" : "es"}.`}</p>}
+        <div className="timeline-heading"><span>Level {level + 1} of {LEVELS.length}</span><strong>{clean ? `${found} / ${total} found` : "–"}</strong></div>
+        <div className="status"><i className={`dot ${done ? "ready" : "playing"}`} />{status}</div>
+        <p className="visually-hidden" aria-live="polite">{announcement}</p>
+        {failed && <p className="error denoise-error">The whale image couldn't be loaded. Check your connection, then try again.
+          <button className="secondary" onClick={() => start(level)}>Try again</button></p>}
+        {done && <p className="denoise-done"><span aria-hidden>✓</span> {last ? "All levels done." : `Restored with ${misses(missCount)}.`}</p>}
         <div className="generator-actions denoise-actions">
-          {done && !last && <button className="run" onClick={() => start(level + 1)}>Next level <span>▶</span></button>}
+          {done && !last && <button className="run" onClick={() => start(level + 1)}>Next level <span aria-hidden>▶</span></button>}
           <button className="secondary" onClick={() => start(level)}>Reset level</button>
           <button className="secondary" onClick={() => start(0)}>Start again</button>
-          {skipUnlocked && !done && <button className={`secondary denoise-skip${skipJustUnlocked ? " revealed" : ""}`} onClick={skip}
+          {skipUnlocked && !done && <button className={`secondary denoise-skip${skipJustUnlocked ? " revealed" : ""}`} onClick={skip} disabled={!clean}
             onAnimationEnd={(event) => { if (event.animationName === "skip-reveal") setSkipJustUnlocked(false); }}>Skip level</button>}
         </div>
         <p className="denoise-disclaimer"><strong>Simplified example</strong>Real diffusion models solve a considerably harder problem.</p>
       </div>
       <div className="viewer">
         <div className="canvas-shell">
-          <canvas ref={canvasRef} width={SIZE} height={SIZE} className="denoise-canvas" onClick={click}
-            aria-label={`Noisy whale, ${remaining.size} noisy pixels left`} />
+          <canvas ref={canvasRef} width={SIZE} height={SIZE} className="denoise-canvas" tabIndex={0}
+            aria-label="Noisy whale. Use the arrow keys to move, and Enter to pick a pixel." aria-describedby="denoise-instructions"
+            onClick={(event) => { setShowCursor(false); pick(pixelAt(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect())); }}
+            onKeyDown={onCanvasKey} onBlur={() => setShowCursor(false)} />
+          {showCursor && !done && <span className="denoise-cursor" aria-hidden
+            style={{ left: `${cursor % SIZE / SIZE * 100}%`, top: `${Math.floor(cursor / SIZE) / SIZE * 100}%`, width: `${100 / SIZE}%`, height: `${100 / SIZE}%` }} />}
           {done && <span className="denoise-tick" aria-hidden>✓</span>}
         </div>
       </div>
