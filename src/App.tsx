@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { forwardDiffuse, gaussianNoise, MODELS, tensorToRgba, type ModelConfig } from "./diffusion";
+import { gaussianNoise, MODELS, tensorToRgba, type ModelConfig } from "./diffusion";
 import type { WorkerRequest, WorkerResponse } from "./protocol";
+import { DenoiseGame } from "./DenoiseGame";
 
 type Phase = "loading" | "generating" | "ready" | "playing" | "error";
 const TRAINING_TIMESTEPS = [0, 70, 180, 330, 500, 680, 840, 999];
@@ -104,7 +105,7 @@ function DiffusionGenerator({ config }: { config: ModelConfig }) {
   }
 
   return <section className="model-section" aria-labelledby={`${config.id}-heading`}>
-    <h2 id={`${config.id}-heading`}>{config.label} diffusion generator</h2>
+    <h2 id={`${config.id}-heading`}>The resulting diffusion generator</h2>
     <div className="generator-card">
       <div className="controls">
         <div className="settings">
@@ -136,29 +137,9 @@ function DiffusionGenerator({ config }: { config: ModelConfig }) {
     </div>
     {savedFrames.length > 0 && <div className={`saved-gallery saved-gallery-${config.imageSize}`} aria-label={`Saved ${config.label} images`}>
       <div className="gallery-heading">Saved images <span>{savedFrames.length}</span></div>
-      <div className="gallery-images">{savedFrames.map((saved, index) => <PixelCell key={saved.id} pixels={saved.pixels} size={config.imageSize} label={`Saved ${config.label} whale ${index + 1}`} />)}</div>
+      <div className="gallery-images">{savedFrames.map((saved, index) => <PixelCell key={saved.id} pixels={saved.pixels} size={config.imageSize} label={`Saved whale ${index + 1}`} />)}</div>
     </div>}
   </section>;
-}
-
-function makeOrca(size: number, row: number): Float32Array {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
-  const palette = [[5, 35, 57], [7, 50, 68], [8, 43, 64], [9, 57, 70], [12, 38, 68]][row];
-  const gradient = ctx.createLinearGradient(0, 0, 0, size);
-  gradient.addColorStop(0, `rgb(${palette.join(" ")})`); gradient.addColorStop(1, `rgb(${palette[0] + 25} ${palette[1] + 65} ${palette[2] + 65})`);
-  ctx.fillStyle = gradient; ctx.fillRect(0, 0, size, size);
-  ctx.save(); ctx.translate(size * (.44 + row * .025), size * (.50 + (row % 2 ? .08 : -.04))); ctx.rotate((row - 2) * .12); ctx.scale(row % 2 ? -1 : 1, 1);
-  const scale = size * (.7 + row * .045);
-  ctx.fillStyle = "#071116"; ctx.beginPath(); ctx.ellipse(0, 0, scale * .48, scale * .16, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(-scale*.42, 0); ctx.lineTo(-scale*.65, -scale*.15); ctx.lineTo(-scale*.56, 0); ctx.lineTo(-scale*.65, scale*.15); ctx.closePath(); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(-scale*.08, -scale*.12); ctx.lineTo(scale*.02, -scale*.42); ctx.lineTo(scale*.12, -scale*.12); ctx.fill();
-  ctx.fillStyle = "#edf4ed"; ctx.beginPath(); ctx.ellipse(scale*.17, scale*.06, scale*.22, scale*.065, -.1, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(scale*.30, -scale*.07, scale*.06, scale*.035, -.25, 0, Math.PI*2); ctx.fill(); ctx.restore();
-  const data = ctx.getImageData(0, 0, size, size).data, plane = size * size, tensor = new Float32Array(plane * 3);
-  for (let i = 0; i < plane; i++) for (let c = 0; c < 3; c++) tensor[i + plane*c] = data[i*4+c] / 127.5 - 1;
-  return tensor;
 }
 
 function PixelCell({ pixels, size, label }: { pixels: Uint8ClampedArray; size: number; label: string }) {
@@ -168,22 +149,11 @@ function PixelCell({ pixels, size, label }: { pixels: Uint8ClampedArray; size: n
 }
 
 function TrainingIllustrator({ config }: { config: ModelConfig }) {
-  if (config.id === "orca32") return <section className="training-section" aria-labelledby={`${config.id}-training`}>
-    <h2 id={`${config.id}-training`}>Training the {config.label} model</h2>
-    <p className="section-note">We procedurally generate illustrations of whales, add varying amounts of noise, and train the model to predict the information needed to recover the original image.</p>
-    <div className="table-scroll"><table><thead><tr>{TRAINING_TIMESTEPS.map((t, index) => <th key={t}>{index === 0 ? "Clean" : `t ${t}`}</th>)}</tr></thead>
-      <tbody>{Array.from({ length: 5 }, (_, row) => <tr key={row}>{TRAINING_TIMESTEPS.map((timestep, column) => <td key={column}><img className="training-pixel" src={`${import.meta.env.BASE_URL}training/32/${row}-${column}.png`} alt={`Original 32 pixel training example ${row + 1}, ${column === 0 ? "clean" : `noise timestep ${timestep}`}`} /></td>)}</tr>)}</tbody></table></div>
-  </section>;
-  const rows = Array.from({ length: 5 }, (_, row) => {
-    const clean = makeOrca(config.imageSize, row);
-    const noise = gaussianNoise(clean.length, 81_000 + config.imageSize * 100 + row);
-    return TRAINING_TIMESTEPS.map((timestep) => tensorToRgba(timestep === 0 ? clean : forwardDiffuse(clean, noise, timestep), config.imageSize));
-  });
   return <section className="training-section" aria-labelledby={`${config.id}-training`}>
-    <h2 id={`${config.id}-training`}>Training the {config.label} model</h2>
+    <h2 id={`${config.id}-training`}>Training the model</h2>
     <p className="section-note">We procedurally generate illustrations of whales, add varying amounts of noise, and train the model to predict the information needed to recover the original image.</p>
     <div className="table-scroll"><table><thead><tr>{TRAINING_TIMESTEPS.map((t, index) => <th key={t}>{index === 0 ? "Clean" : `t ${t}`}</th>)}</tr></thead>
-      <tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((pixels, column) => <td key={column}><PixelCell pixels={pixels} size={config.imageSize} label={`Training example ${rowIndex + 1}, ${column === 0 ? "clean" : `noise timestep ${TRAINING_TIMESTEPS[column]}`}`} /></td>)}</tr>)}</tbody></table></div>
+      <tbody>{Array.from({ length: 5 }, (_, row) => <tr key={row}>{TRAINING_TIMESTEPS.map((timestep, column) => <td key={column}><img className="training-pixel" src={`${import.meta.env.BASE_URL}training/32/${row}-${column}.png`} alt={`Training example ${row + 1}, ${column === 0 ? "clean" : `noise timestep ${timestep}`}`} /></td>)}</tr>)}</tbody></table></div>
   </section>;
 }
 
@@ -322,10 +292,9 @@ function FluxShowcase() {
 export function App() {
   return <main>
     <header><h1>Little Whale Diffusion Explorer</h1></header>
+    <DenoiseGame />
     <TrainingIllustrator config={MODELS[0]} />
     <DiffusionGenerator config={MODELS[0]} />
-    <TrainingIllustrator config={MODELS[1]} />
-    <DiffusionGenerator config={MODELS[1]} />
     <FluxShowcase />
   </main>;
 }

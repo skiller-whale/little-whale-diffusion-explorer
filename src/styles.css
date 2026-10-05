@@ -38,6 +38,31 @@ canvas { display: block; image-rendering: pixelated; }
 .flux-thumbs .thumb.selected { border-color: var(--lime); box-shadow: 0 0 0 1px var(--lime); }
 .flux-thumbs .thumb.selected span { color: var(--ink); }
 .saved-gallery { padding: 16px 18px 18px; border: 1px solid var(--line); border-top: 0; background: rgba(10, 40, 49, .4); }.gallery-heading { margin-bottom: 13px; color: var(--muted); font: 9px ui-monospace, monospace; text-transform: uppercase; letter-spacing: .09em; }.gallery-heading span { margin-left: 6px; color: var(--ink); }.gallery-images { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }.gallery-images canvas { flex: none; width: auto; height: auto; border: 1px solid #31545a; }
-.saved-gallery-32 .gallery-images canvas, .saved-gallery-64 .gallery-images canvas { width: 112px; height: 112px; }
+.saved-gallery-32 .gallery-images canvas { width: 112px; height: 112px; }
 @media (max-width: 760px) { main { padding-top: 34px; } header { margin-bottom: 40px; } section { margin-top: 64px; } .generator-card { grid-template-columns: 1fr; } .controls { border-right: 0; border-bottom: 1px solid var(--line); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
+
+/* Experimental "be the model" denoising game */
+.denoise-canvas { cursor: crosshair; }
+.denoise-done { margin: 22px 0 0; color: var(--lime); font-size: 14px; }
+.denoise-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 26px 0 32px; }
+.denoise-actions .run { grid-column: 1 / -1; white-space: nowrap; }
+.denoise-actions .secondary { align-self: stretch; white-space: nowrap; }
+.denoise-actions .secondary + .secondary + .denoise-skip { grid-column: 1 / -1; }
+.denoise-skip { position: relative; overflow: hidden; }
+.denoise-skip.revealed { color: var(--lime); border-color: var(--lime); animation: skip-reveal 1.4s cubic-bezier(.2, 1.4, .4, 1) both; }
+.denoise-skip.revealed::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 30%, #c9f27b88 50%, transparent 70%); transform: translateX(-120%); animation: skip-shine .9s .35s ease-out forwards; pointer-events: none; }
+@keyframes skip-reveal {
+  0% { opacity: 0; transform: translateY(10px) scale(.6); box-shadow: 0 0 0 0 #c9f27b00; }
+  35% { opacity: 1; transform: translateY(0) scale(1.12); box-shadow: 0 0 0 0 #c9f27bcc; }
+  55% { transform: scale(.96); }
+  75% { transform: scale(1.02); box-shadow: 0 0 0 14px #c9f27b00; }
+  100% { transform: scale(1); box-shadow: 0 0 22px 0 #c9f27b00; }
+}
+@keyframes skip-shine { to { transform: translateX(120%); } }
+@media (prefers-reduced-motion: reduce) { .denoise-skip.revealed, .denoise-skip.revealed::after { animation-duration: .01s; animation-delay: 0s; } }
+.denoise-tick { position: absolute; inset: 0; display: grid; place-items: center; color: var(--lime); font-size: clamp(64px, 14vw, 140px); text-shadow: 0 0 30px #000a; pointer-events: none; animation: tick-in .35s ease-out; }
+.denoise-disclaimer { margin: auto 0 0; padding: 14px 16px; border: 1px solid #c9f27b66; background: #c9f27b14; color: var(--ink); font-size: 13px; line-height: 1.5; }
+.denoise-disclaimer strong { display: block; margin-bottom: 4px; color: var(--lime); font: 600 10px ui-monospace, monospace; text-transform: uppercase; letter-spacing: .1em; }
+@keyframes tick-in { from { opacity: 0; transform: scale(.6); } }
+@media (prefers-reduced-motion: reduce) { .denoise-tick { animation: none; } }

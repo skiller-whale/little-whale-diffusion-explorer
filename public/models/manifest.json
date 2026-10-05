@@ -10,25 +10,13 @@
       "schedule": "cosine",
       "predictionType": "clean",
       "outputName": "predicted_clean",
-      "inferenceStepRange": [1, 100],
+      "inferenceStepRange": [
+        1,
+        100
+      ],
       "defaultInferenceSteps": 20,
       "model": "whale-ddpm-32.onnx",
       "sha256": "1dec39fce1b1a573adb13d5195ce5fd869d4dc9d81a658c08749ab4ea746de45"
-    },
-    {
-      "modelVersion": "4.0.0",
-      "architecture": "unconditional-v-ddpm",
-      "imageSize": 64,
-      "channels": 3,
-      "trainingTimesteps": 1000,
-      "timeEmbeddingSize": 192,
-      "schedule": "cosine",
-      "predictionType": "velocity",
-      "outputName": "predicted_velocity",
-      "inferenceStepRange": [1, 100],
-      "defaultInferenceSteps": 20,
-      "model": "whale-ddpm-64.onnx",
-      "sha256": "0438340789f8464c0871e916861880f7a3f53fe331353d00c6400ded4c3d3d1a"
     }
   ]
 }

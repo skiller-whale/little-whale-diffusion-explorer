@@ -31,9 +31,9 @@ Run scripts with `node` (not bun) from the scratchpad.
 
 - Status text renders uppercase via CSS — `innerText` returns "READY"/"PLAYING", so match case-insensitively.
 - The FLUX section fetches `flux/manifest.json` then preloads all variant frames in the background on page load; watch `page.on("request")` for `/flux/**.webp` to observe it.
-- The ONNX diffusion generators load models in a worker and take a while; the FLUX section is independent of them.
+- The ONNX diffusion generator loads its model in a worker and take a while; the FLUX section is independent of them.
 
 ## Flows worth driving
 
 - FLUX section: thumbnails select variants, Play animates the denoising timeline, timeline slider scrubs.
-- Orca generators: seed/steps controls regenerate frames; Play/scrub/Save.
+- Orca generator: seed/steps controls regenerate frames; Play/scrub/Save.
